@@ -19,7 +19,7 @@ def unpatch_directory(original_dir: str) -> None:
     # No action if the backup folder is empty
     backup_files = [f for f in os.listdir(backup_dir) if os.path.isfile(os.path.join(backup_dir, f))]
     if not backup_files:
-        print("📁 The backup is empty: {backup_dir}")
+        print(f"📁 The backup is empty: {backup_dir}")
         return
 
     print(f"🔄 Restoring from: {backup_dir}")

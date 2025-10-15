@@ -52,7 +52,7 @@ def detect_diff_blocks(file1_path: str, file2_path: str) -> list:
             diff_blocks.append({
                 'type': 'modified',
                 'start_line': i1 + 1,
-                'original_lines': [line.rstrip('\n') for line in lines1[i1:i2]],
+                'line_count': i2 - i1,
                 'new_lines': [line.rstrip('\n') for line in lines2[j1:j2]]
             })
         # 'delete' means the lines were deleted
@@ -60,7 +60,7 @@ def detect_diff_blocks(file1_path: str, file2_path: str) -> list:
             diff_blocks.append({
                 'type': 'deleted',
                 'start_line': i1 + 1,
-                'lines': [line.rstrip('\n') for line in lines1[i1:i2]]
+                'line_count': i2 - i1
             })
         # 'insert' means the lines were added
         elif tag == 'insert':

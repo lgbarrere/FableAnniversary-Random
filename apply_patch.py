@@ -24,23 +24,18 @@ def apply_diff_blocks_to_file(original_lines: list[str], diffs) -> list[str]:
         idx = diff['start_line'] - 1
 
         if diff['type'] == 'deleted':
-            original_block = [line + '\n' for line in diff['lines']]
-            del lines[idx:idx + len(original_block)]
+            line_count = diff['line_count']
+            del lines[idx:idx + line_count]
 
         elif diff['type'] == 'added':
             new_block = [line + '\n' for line in diff['lines']]
             lines[idx:idx] = new_block
 
         elif diff['type'] == 'modified':
-            original_block = [line + '\n' for line in diff['original_lines']]
+            line_count = diff['line_count']
             new_block = [line + '\n' for line in diff['new_lines']]
-            if lines[idx:idx + len(original_block)] == original_block:
-                del lines[idx:idx + len(original_block)]
-                lines[idx:idx] = new_block
-            # Should not occur: original block not found, ignore it
-            else:
-                print(f"⚠️  The modified block cannot be found at the line {idx + 1} → ignored")
-                continue
+            del lines[idx:idx + line_count]
+            lines[idx:idx] = new_block
 
     return lines
 
