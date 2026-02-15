@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="dinput8/dinput8.vcxproj" Id="f206f79b-8250-4778-b07a-b940df6ea875" />
+</Solution>
