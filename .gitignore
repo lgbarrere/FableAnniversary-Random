@@ -1,4 +1,10 @@
+# Visual Studio configs
 /.vs
 /dinput8/.vs
+
+# Build
 /dinput8/dinput8/Release
 /dinput8/Release
+
+# Logs
+*.log
