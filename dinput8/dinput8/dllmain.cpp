@@ -1,4 +1,16 @@
+// =============================================================================
+// Project      : FableAnniversary-Random
+// File         : dllmain.cpp
+// Author       : FableModLoader
+// Created      : 2026-03-15
+// Description  : Entry point for the dinput8 proxy DLL.
+//                Forwards DirectInput8Create to the real system DLL, loads
+//                any *.dll files from the "mods" folder, and triggers the
+//                function-prototype dump for Fable.exe on startup.
+// =============================================================================
+
 #include "pch.h"
+#include "function_dumper.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -94,6 +106,12 @@ DWORD WINAPI InitThread(LPVOID) {
   Log("Fable Mod Loader Initialized");
 
   LoadMods();
+
+  // Dump all function prototypes from Fable.exe.
+  // Output is written to FableFunctions.log in the game directory.
+  Log("Starting function prototype dump...");
+  DumpFunctionPrototypes();
+  Log("Function prototype dump complete -> FableFunctions.log");
 
   Log("InitThread finished");
   return 0;
