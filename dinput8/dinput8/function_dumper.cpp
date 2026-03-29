@@ -31,7 +31,7 @@
 #include <windows.h>
 
 // UnDecorateSymbolName is the only DbgHelp function we keep (for RTTI name
-// demangling).  Include DbgHelp with UNICODE suppressed so the TCHAR macros
+// demangling). Include DbgHelp with UNICODE suppressed so the TCHAR macros
 // resolve to the narrow-string variants.
 #ifdef UNICODE
 #define _FML_RESTORE_UNICODE
@@ -443,6 +443,7 @@ void DumpFunctionPrototypes() {
   if (!g_fp)
     return;
 
+  // Header of the log file
   WriteLine("=================================================================="
             "==============");
   WriteLine("  FableAnniversary-Random  |  Function Prototype Dump");
@@ -545,6 +546,7 @@ void DumpFunctionPrototypes() {
               (unsigned)e.rva, src, proto.c_str());
   }
 
+  // Footer of the log file
   WriteLine("");
   WriteLine("=================================================================="
             "==============");
