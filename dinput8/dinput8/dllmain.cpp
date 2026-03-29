@@ -1,16 +1,14 @@
 // =============================================================================
-// Project      : FableAnniversary-Random
-// File         : dllmain.cpp
-// Author       : FableModLoader
-// Created      : 2026-03-15
+// Author       : Yaranorgoth
 // Description  : Entry point for the dinput8 proxy DLL.
 //                Forwards DirectInput8Create to the real system DLL, loads
 //                any *.dll files from the "mods" folder, and triggers the
 //                function-prototype dump for Fable.exe on startup.
 // =============================================================================
 
-#include "pch.h"
 #include "function_dumper.h"
+#include "pch.h"
+#include "windowed_hook.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -104,6 +102,11 @@ void LoadMods() {
 // ----------------------
 DWORD WINAPI InitThread(LPVOID) {
   Log("Fable Mod Loader Initialized");
+
+  // Hook IDirect3D9::CreateDevice before the game's render loop starts,
+  // so the game always launches in windowed mode.
+  InstallWindowedHook();
+  Log("Windowed hook installed.");
 
   LoadMods();
 

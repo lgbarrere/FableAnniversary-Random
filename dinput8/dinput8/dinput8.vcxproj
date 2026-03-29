@@ -143,10 +143,12 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="function_dumper.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="windowed_hook.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="function_dumper.cpp" />
+    <ClCompile Include="windowed_hook.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
