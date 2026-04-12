@@ -5,6 +5,11 @@
 # Build
 /dinput8/dinput8/Release
 /dinput8/Release
+/mods/*/Release
+/mods/*/Debug
+*.ipdb
+*.iobj
+*.pdb
 
 # Logs
 *.log

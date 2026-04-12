@@ -67,14 +67,19 @@ if exist "%DEFAULT_DIR_FTLC_STEAM%\%FABLE_EXE%" (
     pause
 )
 
-exit /b
+exit
+
+:: ----------------------
+:: Deploy the Mods
+:: ----------------------
 
 :DeployMods
-if not exist "%BUILT_MODS_DIR%" (
-    echo WARNING: Compiled mods folder not found! No mods were deployed.
+    if not exist "%BUILT_MODS_DIR%" (
+        echo WARNING: Compiled mods folder not found! No mods were deployed.
+        pause
+        exit /b
+    )
+    echo Copying all mods from %BUILT_MODS_DIR% to %DEFAULT_DIR_FTLC_STEAM%\mods
+    xcopy /Y /S /I "%BUILT_MODS_DIR%\*.dll" "%DEFAULT_DIR_FTLC_STEAM%\mods\"
+    echo Done.
     exit /b
-)
-echo Copying all mods from %BUILT_MODS_DIR% to %DEFAULT_DIR_FTLC_STEAM%\mods
-xcopy /Y /S /I "%BUILT_MODS_DIR%\*" "%DEFAULT_DIR_FTLC_STEAM%\mods\"
-echo Done.
-exit /b
