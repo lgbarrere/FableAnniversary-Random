@@ -140,12 +140,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="add_item_mod.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="function_dumper.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="windowed_hook.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="add_item_mod.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="function_dumper.cpp" />
     <ClCompile Include="windowed_hook.cpp" />

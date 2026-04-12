@@ -63,6 +63,7 @@ if exist "%DEFAULT_DIR_FTLC_STEAM%\%FABLE_EXE%" (
     start "" "%DEFAULT_DIR_FTLC_STEAM%\%FABLE_EXE%"
 ) else (
     echo Fable.exe not found!
+    pause
 )
 
 exit

@@ -12,4 +12,7 @@
 // Add headers to precompile here
 #include "framework.h"
 
+// Unified logger
+void Log(const char *format, ...);
+
 #endif // PCH_H

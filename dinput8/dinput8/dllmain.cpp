@@ -6,8 +6,10 @@
 //                function-prototype dump for Fable.exe on startup.
 // =============================================================================
 
-#include "function_dumper.h"
 #include "pch.h"
+
+#include "add_item_mod.h"
+#include "function_dumper.h"
 #include "windowed_hook.h"
 
 #include <cstdio>
@@ -58,11 +60,16 @@ DirectInput8Create(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf,
 }
 
 // ----------------------
+// Global Log Path
+// ----------------------
+char g_LogPath[MAX_PATH] = "FableModLoader.log";
+
+// ----------------------
 // File logger
 // ----------------------
 void Log(const char *format, ...) {
   FILE *fp;
-  fopen_s(&fp, "FableModLoader.log", "a");
+  fopen_s(&fp, g_LogPath, "a");
   if (!fp)
     return;
 
@@ -101,6 +108,12 @@ void LoadMods() {
 // Initialization thread
 // ----------------------
 DWORD WINAPI InitThread(LPVOID) {
+  // Truncate the log file so each game session starts with a clean log.
+  // We use the absolute path resolved in DllMain to avoid working-directory issues.
+  FILE *fp = nullptr;
+  fopen_s(&fp, g_LogPath, "w");
+  if (fp) fclose(fp);
+
   Log("Fable Mod Loader Initialized");
 
   // Hook IDirect3D9::CreateDevice before the game's render loop starts,
@@ -110,14 +123,24 @@ DWORD WINAPI InitThread(LPVOID) {
 
   LoadMods();
 
+  // Install the AddItemToInventory mod.
+  // Press F1 in-game to trigger; see add_item_mod.cpp for configuration.
+  InstallAddItemMod();
+  Log("AddItem mod installed.");
+
   // Dump all function prototypes from Fable.exe.
   // Output is written to FableFunctions.log in the game directory.
   Log("Starting function prototype dump...");
   DumpFunctionPrototypes();
   Log("Function prototype dump complete -> FableFunctions.log");
 
-  Log("InitThread finished");
-  return 0;
+  Log("Startup complete. Mod loader running.");
+
+  // Keep this thread alive for the entire game session.
+  // Sleeping prevents CPU waste while ensuring the DLL and all its sub-threads
+  // (e.g. AddItemThread) remain active until the process exits.
+  while (true)
+    Sleep(1000);
 }
 
 // ----------------------
@@ -126,6 +149,16 @@ DWORD WINAPI InitThread(LPVOID) {
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
   if (reason == DLL_PROCESS_ATTACH) {
     DisableThreadLibraryCalls(hModule);
+
+    // Resolve the absolute path to this DLL so we can place logs next to it
+    // regardless of where Steam/Fable sets the current working directory.
+    if (GetModuleFileNameA(hModule, g_LogPath, MAX_PATH)) {
+      char *lastSlash = strrchr(g_LogPath, '\\');
+      if (lastSlash) {
+        strcpy_s(lastSlash + 1, MAX_PATH - (lastSlash - g_LogPath) - 1,
+                 "FableModLoader.log");
+      }
+    }
 
     // Create a thread for anything that may take time
     CreateThread(nullptr, 0, InitThread, nullptr, 0, nullptr);
