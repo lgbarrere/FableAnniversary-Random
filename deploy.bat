@@ -2,6 +2,7 @@
 
 set "SOLUTION=.\dinput8\dinput8.slnx"
 set "BUILD_DLL=.\dinput8\Release\dinput8.dll"
+set "BUILT_MODS_DIR=.\dinput8\Release\mods"
 set "DEFAULT_DIR_FTLC_STEAM=%ProgramFiles(x86)%\Steam\steamapps\common\Fable The Lost Chapters"
 set "FABLE_EXE=Fable.exe"
 
@@ -37,8 +38,6 @@ if errorlevel 1 (
 )
 echo Build succeeded.
 
-set "MOD_DLL=.\dinput8\Release\add_item_mod.dll"
-
 :: ----------------------
 :: Deploy the DLL
 :: ----------------------
@@ -58,16 +57,7 @@ if not exist "%DEFAULT_DIR_FTLC_STEAM%" (
 echo Copying %BUILD_DLL% to %DEFAULT_DIR_FTLC_STEAM%
 copy /Y "%BUILD_DLL%" "%DEFAULT_DIR_FTLC_STEAM%\dinput8.dll"
 
-if not exist "%DEFAULT_DIR_FTLC_STEAM%\mods" mkdir "%DEFAULT_DIR_FTLC_STEAM%\mods"
-
-if exist "%MOD_DLL%" (
-    echo Copying "%MOD_DLL%" to "%DEFAULT_DIR_FTLC_STEAM%\mods\add_item_mod.dll"
-    copy /Y "%MOD_DLL%" "%DEFAULT_DIR_FTLC_STEAM%\mods\add_item_mod.dll"
-) else (
-    echo WARNING: add_item_mod DLL not found! It was not deployed.
-)
-
-echo Done.
+call :DeployMods
 
 if exist "%DEFAULT_DIR_FTLC_STEAM%\%FABLE_EXE%" (
     echo Launching Fable...
@@ -77,4 +67,14 @@ if exist "%DEFAULT_DIR_FTLC_STEAM%\%FABLE_EXE%" (
     pause
 )
 
-exit
+exit /b
+
+:DeployMods
+if not exist "%BUILT_MODS_DIR%" (
+    echo WARNING: Compiled mods folder not found! No mods were deployed.
+    exit /b
+)
+echo Copying all mods from %BUILT_MODS_DIR% to %DEFAULT_DIR_FTLC_STEAM%\mods
+xcopy /Y /S /I "%BUILT_MODS_DIR%\*" "%DEFAULT_DIR_FTLC_STEAM%\mods\"
+echo Done.
+exit /b
