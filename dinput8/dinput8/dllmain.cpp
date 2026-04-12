@@ -8,7 +8,6 @@
 
 #include "pch.h"
 
-#include "add_item_mod.h"
 #include "function_dumper.h"
 #include "windowed_hook.h"
 
@@ -109,10 +108,12 @@ void LoadMods() {
 // ----------------------
 DWORD WINAPI InitThread(LPVOID) {
   // Truncate the log file so each game session starts with a clean log.
-  // We use the absolute path resolved in DllMain to avoid working-directory issues.
+  // We use the absolute path resolved in DllMain to avoid working-directory
+  // issues.
   FILE *fp = nullptr;
   fopen_s(&fp, g_LogPath, "w");
-  if (fp) fclose(fp);
+  if (fp)
+    fclose(fp);
 
   Log("Fable Mod Loader Initialized");
 
@@ -122,11 +123,6 @@ DWORD WINAPI InitThread(LPVOID) {
   Log("Windowed hook installed.");
 
   LoadMods();
-
-  // Install the AddItemToInventory mod.
-  // Press F1 in-game to trigger; see add_item_mod.cpp for configuration.
-  InstallAddItemMod();
-  Log("AddItem mod installed.");
 
   // Dump all function prototypes from Fable.exe.
   // Output is written to FableFunctions.log in the game directory.

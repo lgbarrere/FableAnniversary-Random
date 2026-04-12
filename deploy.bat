@@ -37,6 +37,8 @@ if errorlevel 1 (
 )
 echo Build succeeded.
 
+set "MOD_DLL=.\dinput8\Release\add_item_mod.dll"
+
 :: ----------------------
 :: Deploy the DLL
 :: ----------------------
@@ -55,6 +57,15 @@ if not exist "%DEFAULT_DIR_FTLC_STEAM%" (
 
 echo Copying %BUILD_DLL% to %DEFAULT_DIR_FTLC_STEAM%
 copy /Y "%BUILD_DLL%" "%DEFAULT_DIR_FTLC_STEAM%\dinput8.dll"
+
+if not exist "%DEFAULT_DIR_FTLC_STEAM%\mods" mkdir "%DEFAULT_DIR_FTLC_STEAM%\mods"
+
+if exist "%MOD_DLL%" (
+    echo Copying "%MOD_DLL%" to "%DEFAULT_DIR_FTLC_STEAM%\mods\add_item_mod.dll"
+    copy /Y "%MOD_DLL%" "%DEFAULT_DIR_FTLC_STEAM%\mods\add_item_mod.dll"
+) else (
+    echo WARNING: add_item_mod DLL not found! It was not deployed.
+)
 
 echo Done.
 

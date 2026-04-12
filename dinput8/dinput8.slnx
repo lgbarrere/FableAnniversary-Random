@@ -4,4 +4,5 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="dinput8/dinput8.vcxproj" Id="f206f79b-8250-4778-b07a-b940df6ea875" />
+  <Project Path="../mods/add_item_mod/add_item_mod.vcxproj" Id="AABBCCDD-1122-3344-5566-778899001122" />
 </Solution>
