@@ -117,42 +117,58 @@ bool SafeRead(LPCVOID addr, DWORD &out) {
 // Resolve the hero's inventory pointer at call time.
 // ---------------------------------------------------------------------------
 void *GetHeroInventory() {
-  // Primary approach: Read the live, robust pThis harvested by hook_logger_mod
-  HMODULE hLogger = GetModuleHandleA("hook_logger_mod.dll");
-  if (hLogger) {
-    auto pLogPtr = (void **)GetProcAddress(hLogger, "g_LastInventoryPtr");
-    if (pLogPtr && *pLogPtr) {
-      return *pLogPtr;
-    }
-  }
+  // Use Fable's native object hierarchy to get the player's inventory component reliably!
 
-  // Fallback: The original static offset chain (often fails on newer builds)
-  DWORD heroHolder = 0;
-  if (!SafeRead(reinterpret_cast<LPCVOID>(kHeroPtrPtr), heroHolder) ||
-      heroHolder == 0) {
-    Log("[AddItemMod] Could not read hero pointer holder at 0x%08X.",
-        kHeroPtrPtr);
+  // 1. Get CMainGameComponent
+  void** ppMainGameComponent = reinterpret_cast<void**>(0x13B86A0);
+  if (IsBadReadPtr(ppMainGameComponent, 4) || !*ppMainGameComponent) {
+    Log("[AddItemMod] NativeInventory: Failed to read CMainGameComponent.");
+    return nullptr;
+  }
+  void* pMainGameComponent = *ppMainGameComponent;
+
+  // 2. Get CPlayerManager (offset 28)
+  void** ppPlayerManager = reinterpret_cast<void**>((char*)pMainGameComponent + 28);
+  if (IsBadReadPtr(ppPlayerManager, 4) || !*ppPlayerManager) {
+    Log("[AddItemMod] NativeInventory: Failed to read CPlayerManager.");
+    return nullptr;
+  }
+  void* pPlayerManager = *ppPlayerManager;
+
+  // 3. Get Main CPlayer
+  auto getMainPlayer = reinterpret_cast<void*(__thiscall*)(void*)>(0x449970);
+  void* pPlayer = getMainPlayer(pPlayerManager);
+  if (!pPlayer) {
+    Log("[AddItemMod] NativeInventory: Failed to get Main Player.");
     return nullptr;
   }
 
-  DWORD heroPtr = 0;
-  if (!SafeRead(reinterpret_cast<LPCVOID>(heroHolder), heroPtr) ||
-      heroPtr == 0) {
-    Log("[AddItemMod] Hero CThing* is null (hero not loaded yet?).");
+  // 4. Get Character CThing
+  auto getCharacterThing = reinterpret_cast<void*(__thiscall*)(void*)>(0x487B70);
+  void* pCharacterThing = getCharacterThing(pPlayer);
+  if (!pCharacterThing) {
+    Log("[AddItemMod] NativeInventory: Failed to get Character Thing.");
     return nullptr;
   }
 
-  DWORD invPtr = 0;
-  if (!SafeRead(reinterpret_cast<LPCVOID>(heroPtr + kInventoryOffset),
-                invPtr) ||
-      invPtr == 0) {
-    Log("[AddItemMod] Inventory component is null (offset 0x%X from CThing "
-        "0x%08X).",
-        kInventoryOffset, heroPtr);
+  // 5. GetTC(17) -> TCI_INVENTORY
+  int tc_id = 17;
+  auto hasTC = reinterpret_cast<bool(__thiscall*)(void*, int)>(0x4118C0);
+  if (!hasTC(pCharacterThing, tc_id)) {
+    Log("[AddItemMod] NativeInventory: Hero has no TCI_INVENTORY!");
     return nullptr;
   }
 
-  return reinterpret_cast<void *>(invPtr);
+  auto getTCNode = reinterpret_cast<int(__thiscall*)(int, int*)>(0x40F020);
+  int v29 = tc_id;
+  int v5 = getTCNode((int)pCharacterThing + 68, &v29);
+  if (v5 == *(int*)((char*)pCharacterThing + 72) || *(int*)v5 > tc_id) {
+    v5 = *(int*)((char*)pCharacterThing + 72);
+  }
+  void* pInventory = *(void**)(v5 + 4);
+
+  Log("[AddItemMod] NativeInventory successfully resolved: 0x%p", pInventory);
+  return pInventory;
 }
 
 // ---------------------------------------------------------------------------
@@ -218,56 +234,17 @@ void DoAddItem() {
     return;
   }
 
-  DWORD def_id = 0;
-  void* pItem = nullptr;
-  HMODULE hLogger = GetModuleHandleA("hook_logger_mod.dll");
-  if (hLogger) {
-    auto pItemPtr = reinterpret_cast<void **>(GetProcAddress(hLogger, "g_LastItemPtr"));
-    if (pItemPtr && *pItemPtr && !IsBadReadPtr(*pItemPtr, 28)) {
-      pItem = *pItemPtr;
-      def_id = reinterpret_cast<DWORD *>(pItem)[6]; // offset 0x18
-    }
-  }
+  // -------------------------------------------------------------------------
+  // Elixir of Life Definition ID
+  // We discovered from our RTTI extraction that the static Definition ID 
+  // for the Elixir of Life is 4294 in Fable The Lost Chapters.
+  // We can directly spawn it without needing to open a chest first!
+  // -------------------------------------------------------------------------
+  int real_def_id = 4294;
 
-  if (pItem == nullptr) {
-    Log("[AddItemMod] g_LastItemPtr is invalid. Open a chest with a real item first.");
-    return;
-  }
+  Log("[AddItemMod] Allocating Elixir of Life using Native def_id=%d...", real_def_id);
 
-  // Safely resolve the REAL definition ID using Fable's native functions:
-  // 1. Get CDefString
-  struct CDefString { int tablePos; };
-  CDefString def;
-  auto getDefName = reinterpret_cast<CDefString*(__thiscall*)(void*, CDefString*)>(0x4C7CC0);
-  getDefName(pItem, &def);
-
-  // 2. Get CCharString from tablePos
-  CCharString charStr;
-  charStr.unk = 0; charStr.str = nullptr;
-  auto getString = reinterpret_cast<CCharString*(__thiscall*)(void*, CCharString*, int)>(0x9D49B0);
-  getString((void*)0x13CA828, &charStr, def.tablePos);
-
-  Log("[AddItemMod] Native item name: '%s' (tablePos=%d)", charStr.str ? charStr.str : "null", def.tablePos);
-
-  // 3. Get Thing ID from Manager
-  auto getManager = reinterpret_cast<int(__cdecl*)()>(0x44C6B0);
-  int manager = getManager();
-  int real_def_id = -1;
-  if (manager) {
-    auto getThingID = reinterpret_cast<int(__thiscall*)(int, CCharString*)>(0x9AD410);
-    real_def_id = getThingID(manager, &charStr);
-  }
-
-  Log("[AddItemMod] Extracted def_id (0x18) = %lu. Real Native def_id = %d", def_id, real_def_id);
-
-  if (real_def_id <= 0) {
-    Log("[AddItemMod] Failed to resolve a valid real_def_id. Aborting to prevent crash.");
-    return;
-  }
-
-  Log("[AddItemMod] Allocating new CThing using Native def_id=%d...", real_def_id);
-
-  // We are on the main thread now, so the Engine TLS allocator works!
+  // We are on the main thread now (WM_SPAWN_ITEM), so the Engine TLS allocator works!
   void *newItem = CreateFableItem(real_def_id);
   if (!newItem || IsBadReadPtr(newItem, 4)) {
     Log("[AddItemMod] CreateFableItem failed to allocate new item!");
