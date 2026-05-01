@@ -13,3 +13,6 @@
 
 # Logs
 *.log
+
+# Temporary helper mod
+FableMenu/
