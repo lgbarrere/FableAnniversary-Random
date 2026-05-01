@@ -242,6 +242,10 @@ void DoAddItem() {
   // -------------------------------------------------------------------------
   int real_def_id = 4294;
 
+  // Potions
+  // 4292 - Health Potion
+  // 4293 - Will Potion
+  // 4294 - Elixir of Life
   Log("[AddItemMod] Allocating Elixir of Life using Native def_id=%d...", real_def_id);
 
   // We are on the main thread now (WM_SPAWN_ITEM), so the Engine TLS allocator works!

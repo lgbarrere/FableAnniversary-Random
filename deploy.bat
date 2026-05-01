@@ -61,7 +61,7 @@ call :DeployMods
 
 if exist "%DEFAULT_DIR_FTLC_STEAM%\%FABLE_EXE%" (
     echo Launching Fable...
-    start "" "%DEFAULT_DIR_FTLC_STEAM%\%FABLE_EXE%"
+    start /D "%DEFAULT_DIR_FTLC_STEAM%" "" "%DEFAULT_DIR_FTLC_STEAM%\%FABLE_EXE%"
 ) else (
     echo Fable.exe not found!
     pause
