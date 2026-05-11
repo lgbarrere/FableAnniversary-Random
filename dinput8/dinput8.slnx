@@ -6,5 +6,5 @@
   <Project Path="dinput8/dinput8.vcxproj" Id="f206f79b-8250-4778-b07a-b940df6ea875" />
   <Project Path="../mods/add_item_mod/add_item_mod.vcxproj" Id="AABBCCDD-1122-3344-5566-778899001122" />
   <Project Path="../mods/hook_logger_mod/hook_logger_mod.vcxproj" Id="B1C2D3E4-F5A6-7B8C-9D0E-1F2A3B4C5D6E" />
-  <Project Path="../mods/disable_add_item_mod/disable_add_item_mod.vcxproj" Id="C2D3E4F5-A6B7-8C9D-0E1F-2A3B4C5D6E7F" />
+  <!-- <Project Path="../mods/disable_add_item_mod/disable_add_item_mod.vcxproj" Id="C2D3E4F5-A6B7-8C9D-0E1F-2A3B4C5D6E7F" /> -->
 </Solution>

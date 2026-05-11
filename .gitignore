@@ -27,7 +27,6 @@ obj/
 
 # Logs
 *.log
-FableFunctions.log
 
 # Temporary helper mod
 FableMenu/
