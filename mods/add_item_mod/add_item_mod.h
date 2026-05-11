@@ -13,13 +13,9 @@
 //       bool     silent            // suppress pickup sound and UI notification
 //   );
 //
-// The inventory base pointer is obtained from the hero's CThing via
-// a known global hero-pointer and a simple offset chain uncovered in the
-// same dump session.
+// The inventory base pointer is obtained from the hero's CThing via Fable's
+// native object hierarchy (CMainGameComponent → CPlayerManager → CPlayer →
+// CThing → TCI_INVENTORY component). All addresses are in fable_addresses.h.
 // =============================================================================
 
 #pragma once
-
-/// Install the mod (called once from InitThread after the game has loaded).
-/// Press F1 in-game to trigger; configure parameters in add_item_mod.cpp.
-void InstallAddItemMod();

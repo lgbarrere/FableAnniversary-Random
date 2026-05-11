@@ -1,18 +1,33 @@
 # Visual Studio configs
-/.vs
-/dinput8/.vs
+.vs/
+*.user
+*.suo
+*.sln.docstates
 
-# Build
-/dinput8/dinput8/Release
-/dinput8/Release
-/mods/*/Release
-/mods/*/Debug
-*.ipdb
-*.iobj
+# Build Results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bin/
+obj/
+
+# Intermediate files
+*.obj
+*.tlog
+*.recipe
+*.ilk
 *.pdb
+*.idb
+*.iobj
+*.ipdb
+*.exp
+*.lib
 
 # Logs
 *.log
+FableFunctions.log
 
 # Temporary helper mod
 FableMenu/

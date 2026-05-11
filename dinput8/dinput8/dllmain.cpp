@@ -27,20 +27,19 @@ typedef HRESULT(WINAPI *DirectInput8Create_t)(HINSTANCE, DWORD, REFIID,
 
 DirectInput8Create_t real_DirectInput8Create = nullptr;
 
-// Loads the real DLL on demand (lazy loading)
+// Loads the real DLL on demand (lazy loading).
 void EnsureLoaded() {
   if (real_DirectInput8Create)
-    return;
+    return; // Already resolved — nothing to do.
 
   if (!realDinput8) {
     char systemPath[MAX_PATH];
     GetSystemDirectoryA(systemPath, MAX_PATH);
     strcat_s(systemPath, "\\dinput8.dll");
-
     realDinput8 = LoadLibraryA(systemPath);
   }
 
-  if (realDinput8 && !real_DirectInput8Create) {
+  if (realDinput8) {
     real_DirectInput8Create =
         (DirectInput8Create_t)GetProcAddress(realDinput8, "DirectInput8Create");
   }

@@ -6,10 +6,6 @@ set "BUILT_MODS_DIR=.\dinput8\Release\mods"
 set "DEFAULT_DIR_FTLC_STEAM=%ProgramFiles(x86)%\Steam\steamapps\common\Fable The Lost Chapters"
 set "FABLE_EXE=Fable.exe"
 
-:: ----------------------
-:: Build the DLL
-:: ----------------------
-
 :: Locate MSBuild via vswhere (works for VS 2017+)
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 
@@ -29,6 +25,16 @@ if not defined MSBUILD (
     exit /b 1
 )
 
+:: ----------------------
+:: Clean previous build artifacts
+:: ----------------------
+echo Cleaning previous build artifacts...
+if exist "%BUILD_DLL%" del /Q "%BUILD_DLL%"
+if exist "%BUILT_MODS_DIR%" del /Q "%BUILT_MODS_DIR%\*.dll"
+
+:: ----------------------
+:: Build the DLL
+:: ----------------------
 echo Building dinput8.dll (Release^|x86)...
 "%MSBUILD%" "%SOLUTION%" /p:Configuration=Release /p:Platform=x86 /v:minimal /nologo
 if errorlevel 1 (
