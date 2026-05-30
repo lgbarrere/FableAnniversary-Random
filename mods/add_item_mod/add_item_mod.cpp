@@ -44,6 +44,9 @@
 
 #include <windows.h>
 
+// Exposed to disable_add_item_mod.cpp to not cancel item additions from add_item_mod
+extern "C" __declspec(dllexport) bool g_AddingItemFromMod = false;
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -172,11 +175,13 @@ void DoAddItem() {
   Log("[AddItemMod] Calling AddItemToInventory(inv=0x%p, item=0x%p) ...",
       inventory, newItem);
 
+  g_AddingItemFromMod = true;
   char result = fn(inventory, newItem,
                    /*add_selected    =*/false,
                    /*add_quick_access=*/true,
                    /*price_bought_for=*/0,
                    /*silent          =*/false);
+  g_AddingItemFromMod = false;
 
   Log("[AddItemMod] AddItemToInventory returned %d.", (int)(unsigned char)result);
 }

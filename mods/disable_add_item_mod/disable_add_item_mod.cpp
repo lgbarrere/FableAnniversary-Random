@@ -29,6 +29,7 @@
 
 #include "../shared/cthing_dump.h"
 #include "../shared/fable_addresses.h"
+#include "../shared/fable_types.h"
 #include "../shared/mod_log.h"
 
 #include <cstring>
@@ -45,15 +46,52 @@ static volatile bool g_hookInstalled = false;
 /// Snapshot of our patch bytes so the watchdog can detect overwrites.
 static BYTE g_ourPatch[kPatchSize] = {};
 
+/// Snapshot of the original bytes to restore when we need to call the original function.
+static BYTE g_originalBytes[kPatchSize] = {};
+
+static bool ApplyPatch();
+
+static void RemovePatch() {
+  auto *target = reinterpret_cast<BYTE *>(kAddItemToInventoryAddr);
+  DWORD oldProt = 0;
+  VirtualProtect(target, kPatchSize, PAGE_EXECUTE_READWRITE, &oldProt);
+  std::memcpy(target, g_originalBytes, kPatchSize);
+  FlushInstructionCache(GetCurrentProcess(), target, kPatchSize);
+  VirtualProtect(target, kPatchSize, oldProt, &oldProt);
+}
+
+/// Helper to check if add_item_mod is currently adding an item
+static bool IsAddingItemFromMod() {
+  static bool* pAdding = nullptr;
+  if (!pAdding) {
+    HMODULE addMod = GetModuleHandleA("add_item_mod.dll");
+    if (addMod) {
+      pAdding = reinterpret_cast<bool*>(GetProcAddress(addMod, "g_AddingItemFromMod"));
+    }
+  }
+  return pAdding && *pAdding;
+}
+
 // ---------------------------------------------------------------------------
 // HookBody — plain C function called from the naked thunk.
 //
 // Logs all arguments (same format as hook_logger_mod) then returns 0 to
 // suppress the original AddItemToInventory.
 // ---------------------------------------------------------------------------
-static char __cdecl HookBody(void *pThis, void *item, bool /*add_selected*/,
-                              bool /*add_quick_access*/, int /*price_bought_for*/,
-                              bool /*silent*/) {
+static char __cdecl HookBody(void *pThis, void *item, bool add_selected,
+                              bool add_quick_access, int price_bought_for,
+                              bool silent) {
+  if (IsAddingItemFromMod()) {
+    g_hookInstalled = false;
+    RemovePatch();
+
+    auto fn = reinterpret_cast<AddItemToInventory_t>(kAddItemToInventoryAddr);
+    char result = fn(pThis, item, add_selected, add_quick_access, price_bought_for, silent);
+
+    ApplyPatch();
+    g_hookInstalled = true;
+    return result;
+  }
   const LONG idx = InterlockedIncrement(&g_callCount);
   const CThingDump d = ReadCThingDump(item);
 
@@ -128,6 +166,8 @@ static bool ApplyPatch() {
 // No trampoline is built because we never call the original.
 // ---------------------------------------------------------------------------
 static bool InstallHook() {
+  std::memcpy(g_originalBytes, reinterpret_cast<void*>(kAddItemToInventoryAddr), kPatchSize);
+
   if (!ApplyPatch())
     return false;
 
