@@ -30,6 +30,7 @@
 #include "../shared/cthing_dump.h"
 #include "../shared/fable_addresses.h"
 #include "../shared/fable_types.h"
+#include "../shared/inline_hook.h"
 #include "../shared/mod_log.h"
 
 #include <cstring>
@@ -40,25 +41,10 @@ namespace {
 /// Monotonically increasing call counter for log correlation.
 static volatile LONG g_callCount = 0;
 
-/// Set to true after InstallHook() succeeds.
 static volatile bool g_hookInstalled = false;
 
-/// Snapshot of our patch bytes so the watchdog can detect overwrites.
-static BYTE g_ourPatch[kPatchSize] = {};
-
-/// Snapshot of the original bytes to restore when we need to call the original function.
-static BYTE g_originalBytes[kPatchSize] = {};
-
-static bool ApplyPatch();
-
-static void RemovePatch() {
-  auto *target = reinterpret_cast<BYTE *>(kAddItemToInventoryAddr);
-  DWORD oldProt = 0;
-  VirtualProtect(target, kPatchSize, PAGE_EXECUTE_READWRITE, &oldProt);
-  std::memcpy(target, g_originalBytes, kPatchSize);
-  FlushInstructionCache(GetCurrentProcess(), target, kPatchSize);
-  VirtualProtect(target, kPatchSize, oldProt, &oldProt);
-}
+static void HookThunk();
+static InlineHook<kPatchSize> g_hook(kAddItemToInventoryAddr, reinterpret_cast<void*>(HookThunk));
 
 /// Helper to check if add_item_mod is currently adding an item
 static bool IsAddingItemFromMod() {
@@ -83,12 +69,12 @@ static char __cdecl HookBody(void *pThis, void *item, bool add_selected,
                               bool silent) {
   if (IsAddingItemFromMod()) {
     g_hookInstalled = false;
-    RemovePatch();
+    g_hook.Remove();
 
     auto fn = reinterpret_cast<AddItemToInventory_t>(kAddItemToInventoryAddr);
     char result = fn(pThis, item, add_selected, add_quick_access, price_bought_for, silent);
 
-    ApplyPatch();
+    g_hook.Apply();
     g_hookInstalled = true;
     return result;
   }
@@ -136,42 +122,11 @@ __declspec(naked) static void HookThunk() {
 }
 
 // ---------------------------------------------------------------------------
-// ApplyPatch — writes the JMP unconditionally.
-// Called on first install and by the watchdog on every detected overwrite.
-// ---------------------------------------------------------------------------
-static bool ApplyPatch() {
-  auto *target = reinterpret_cast<BYTE *>(kAddItemToInventoryAddr);
-
-  DWORD oldProt = 0;
-  if (!VirtualProtect(target, kPatchSize, PAGE_EXECUTE_READWRITE, &oldProt)) {
-    Log("[DisableAddItem] VirtualProtect(target 0x%08X) failed: %lu",
-        kAddItemToInventoryAddr, GetLastError());
-    return false;
-  }
-
-  DWORD rel = static_cast<DWORD>(
-      reinterpret_cast<BYTE *>(HookThunk) - (target + 5));
-  target[0] = 0xE9u;
-  std::memcpy(target + 1, &rel, sizeof(DWORD));
-  for (SIZE_T i = 5; i < kPatchSize; ++i)
-    target[i] = 0x90; // NOP padding
-
-  FlushInstructionCache(GetCurrentProcess(), target, kPatchSize);
-  VirtualProtect(target, kPatchSize, oldProt, &oldProt);
-  return true;
-}
-
-// ---------------------------------------------------------------------------
-// InstallHook — first-time patch + snapshot for watchdog comparisons.
-// No trampoline is built because we never call the original.
+// InstallHook — uses InlineHook
 // ---------------------------------------------------------------------------
 static bool InstallHook() {
-  std::memcpy(g_originalBytes, reinterpret_cast<void*>(kAddItemToInventoryAddr), kPatchSize);
-
-  if (!ApplyPatch())
+  if (!g_hook.Install())
     return false;
-
-  std::memcpy(g_ourPatch, reinterpret_cast<void *>(kAddItemToInventoryAddr), kPatchSize);
 
   Log("[DisableAddItem] Hook installed at 0x%08X -> HookThunk @ 0x%p "
       "(original DISABLED, call logging active).",
@@ -189,12 +144,10 @@ static DWORD WINAPI WatchdogThread(LPVOID) {
     if (!g_hookInstalled)
       continue;
 
-    auto *target = reinterpret_cast<BYTE *>(kAddItemToInventoryAddr);
-    if (std::memcmp(target, g_ourPatch, kPatchSize) != 0) {
+    if (g_hook.IsOverwritten()) {
       Log("[DisableAddItem] Patch at 0x%08X was overwritten — re-applying.",
           kAddItemToInventoryAddr);
-      if (ApplyPatch()) {
-        std::memcpy(g_ourPatch, target, kPatchSize);
+      if (g_hook.Apply()) {
         Log("[DisableAddItem] Patch re-applied successfully.");
       }
     }

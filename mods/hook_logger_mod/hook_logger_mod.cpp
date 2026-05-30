@@ -28,6 +28,7 @@
 #include "../shared/cthing_dump.h"
 #include "../shared/fable_addresses.h"
 #include "../shared/fable_types.h"
+#include "../shared/inline_hook.h"
 #include "../shared/mod_log.h"
 
 #include <cstring>
@@ -39,16 +40,11 @@ extern "C" __declspec(dllexport) void *g_LastItemPtr      = nullptr;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Trampoline buffer: [0 .. kPatchSize-1] stolen bytes, [kPatchSize .. +4] JMP back.
-// ---------------------------------------------------------------------------
-static BYTE g_trampoline[kPatchSize + 5] = {};
-
-/// Monotonically increasing call counter for log correlation.
 static volatile LONG g_callCount = 0;
-
-/// Set to true after InstallHook() succeeds.
 static volatile bool g_hookInstalled = false;
+
+static void HookThunk();
+static InlineHook<kPatchSize> g_hook(kAddItemToInventoryAddr, reinterpret_cast<void*>(HookThunk));
 
 // ---------------------------------------------------------------------------
 // HookBody — plain C function called from the naked thunk.
@@ -75,11 +71,16 @@ static char __cdecl HookBody(void *pThis, void *item, bool add_selected,
       d.w[8],  d.w[9],  d.w[10], d.w[11],
       d.w[12], d.w[13], d.w[14], d.w[15]);
 
-  // Call the original via the trampoline.
-  auto original = reinterpret_cast<AddItemToInventory_t>(
-      reinterpret_cast<void *>(g_trampoline));
+  // Call the original by temporarily unhooking.
+  g_hookInstalled = false;
+  g_hook.Remove();
+
+  auto original = reinterpret_cast<AddItemToInventory_t>(kAddItemToInventoryAddr);
   char ret = original(pThis, item, add_selected, add_quick_access,
                       price_bought_for, silent);
+
+  g_hook.Apply();
+  g_hookInstalled = true;
 
   Log("[HookLogger] call #%ld returned %d", (long)idx, (int)(unsigned char)ret);
   return ret;
@@ -118,47 +119,12 @@ __declspec(naked) static void HookThunk() {
 }
 
 // ---------------------------------------------------------------------------
-// InstallHook — builds the trampoline then patches kAddItemToInventoryAddr.
+// InstallHook — builds the hook and patches kAddItemToInventoryAddr.
 // MUST be called from a thread, never from DllMain.
 // ---------------------------------------------------------------------------
 static bool InstallHook() {
-  auto *target = reinterpret_cast<BYTE *>(kAddItemToInventoryAddr);
-
-  // Copy stolen bytes into the trampoline.
-  std::memcpy(g_trampoline, target, kPatchSize);
-
-  // Append JMP back to (target + kPatchSize).
-  BYTE  *jmpSrc = g_trampoline + kPatchSize;
-  DWORD  rel    = static_cast<DWORD>((target + kPatchSize) - (jmpSrc + 5));
-  jmpSrc[0] = 0xE9u;
-  std::memcpy(jmpSrc + 1, &rel, sizeof(DWORD));
-
-  // Make trampoline executable.
-  DWORD oldProt = 0;
-  if (!VirtualProtect(g_trampoline, sizeof(g_trampoline),
-                      PAGE_EXECUTE_READWRITE, &oldProt)) {
-    Log("[HookLogger] VirtualProtect(trampoline) failed: %lu", GetLastError());
+  if (!g_hook.Install())
     return false;
-  }
-  FlushInstructionCache(GetCurrentProcess(), g_trampoline, sizeof(g_trampoline));
-
-  // Patch the target.
-  DWORD targetOldProt = 0;
-  if (!VirtualProtect(target, kPatchSize, PAGE_EXECUTE_READWRITE, &targetOldProt)) {
-    Log("[HookLogger] VirtualProtect(target 0x%08X) failed: %lu",
-        kAddItemToInventoryAddr, GetLastError());
-    return false;
-  }
-
-  DWORD hookRel = static_cast<DWORD>(
-      reinterpret_cast<BYTE *>(HookThunk) - (target + 5));
-  target[0] = 0xE9u;
-  std::memcpy(target + 1, &hookRel, sizeof(DWORD));
-  for (SIZE_T i = 5; i < kPatchSize; ++i)
-    target[i] = 0x90; // NOP padding
-
-  FlushInstructionCache(GetCurrentProcess(), target, kPatchSize);
-  VirtualProtect(target, kPatchSize, targetOldProt, &targetOldProt);
 
   Log("[HookLogger] Hook installed at 0x%08X -> HookThunk @ 0x%p",
       kAddItemToInventoryAddr, reinterpret_cast<void *>(HookThunk));
