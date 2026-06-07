@@ -97,11 +97,7 @@ DWORD WINAPI InitThread(LPVOID) {
 
   Log("Startup complete. Mod loader running.");
 
-  // Keep this thread alive for the entire game session.
-  // Sleeping prevents CPU waste while ensuring the DLL and all its sub-threads
-  // (e.g. AddItemThread) remain active until the process exits.
-  while (true)
-    Sleep(1000);
+  return 0;
 }
 
 // ----------------------
