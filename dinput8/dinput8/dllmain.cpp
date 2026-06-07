@@ -70,8 +70,8 @@ void LoadMods() {
     return;
   }
 
-  for (const auto &entry : std::filesystem::directory_iterator(modPath)) {
-    if (entry.path().extension() == ".dll") {
+  for (const auto &entry : std::filesystem::recursive_directory_iterator(modPath)) {
+    if (entry.is_regular_file() && entry.path().extension() == ".dll") {
       HMODULE mod = LoadLibraryA(entry.path().string().c_str());
       if (mod)
         Log("Loaded mod: %s", entry.path().filename().string().c_str());

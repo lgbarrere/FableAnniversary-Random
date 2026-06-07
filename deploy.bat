@@ -30,7 +30,7 @@ if not defined MSBUILD (
 :: ----------------------
 echo Cleaning previous build artifacts...
 if exist "%BUILD_DLL%" del /Q "%BUILD_DLL%"
-if exist "%BUILT_MODS_DIR%" del /Q "%BUILT_MODS_DIR%\*.dll"
+if exist "%BUILT_MODS_DIR%" del /Q /S "%BUILT_MODS_DIR%\*.dll"
 
 :: ----------------------
 :: Build the DLL

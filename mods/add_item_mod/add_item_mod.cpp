@@ -45,7 +45,7 @@
 
 #include <windows.h>
 
-// Exposed to disable_add_item_mod.cpp to not cancel item additions from add_item_mod
+// Exposed to cancel_vanilla_add_item_mod.cpp to not cancel item additions from add_item_mod
 extern "C" __declspec(dllexport) bool g_AddingItemFromMod = false;
 
 // ---------------------------------------------------------------------------

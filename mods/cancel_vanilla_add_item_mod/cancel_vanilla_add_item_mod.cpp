@@ -25,7 +25,7 @@
 //     DllMain is unsafe).
 // =============================================================================
 
-#include "disable_add_item_mod.h"
+#include "cancel_vanilla_add_item_mod.h"
 
 #include "../shared/cthing_dump.h"
 #include "../shared/fable_addresses.h"
@@ -81,7 +81,7 @@ static char __cdecl HookBody(void *pThis, void *item, bool add_selected,
   const LONG idx = InterlockedIncrement(&g_callCount);
   const CThingDump d = ReadCThingDump(item);
 
-  Log("[DisableAddItem] call #%ld BLOCKED | this=0x%p | item=0x%p | def_id=%lu (0x%X)\n"
+  Log("[CancelVanillaAddItem] call #%ld BLOCKED | this=0x%p | item=0x%p | def_id=%lu (0x%X)\n"
       "    [MemDump] %08X %08X %08X %08X | %08X %08X %08X %08X\n"
       "    [MemDump] %08X %08X %08X %08X | %08X %08X %08X %08X",
       (long)idx, pThis, item, d.def_id, d.def_id,
@@ -128,7 +128,7 @@ static bool InstallHook() {
   if (!g_hook.Install())
     return false;
 
-  Log("[DisableAddItem] Hook installed at 0x%08X -> HookThunk @ 0x%p "
+  Log("[CancelVanillaAddItem] Hook installed at 0x%08X -> HookThunk @ 0x%p "
       "(original DISABLED, call logging active).",
       kAddItemToInventoryAddr, reinterpret_cast<void *>(HookThunk));
   g_hookInstalled = true;
@@ -145,10 +145,10 @@ static DWORD WINAPI WatchdogThread(LPVOID) {
       continue;
 
     if (g_hook.IsOverwritten()) {
-      Log("[DisableAddItem] Patch at 0x%08X was overwritten — re-applying.",
+      Log("[CancelVanillaAddItem] Patch at 0x%08X was overwritten — re-applying.",
           kAddItemToInventoryAddr);
       if (g_hook.Apply()) {
-        Log("[DisableAddItem] Patch re-applied successfully.");
+        Log("[CancelVanillaAddItem] Patch re-applied successfully.");
       }
     }
   }
@@ -163,9 +163,9 @@ static DWORD WINAPI WatchdogThread(LPVOID) {
 static DWORD WINAPI HookInstallThread(LPVOID) {
   Sleep(1500);
 
-  Log("[DisableAddItem] Installing hook at 0x%08X ...", kAddItemToInventoryAddr);
+  Log("[CancelVanillaAddItem] Installing hook at 0x%08X ...", kAddItemToInventoryAddr);
   if (!InstallHook())
-    Log("[DisableAddItem] Hook installation FAILED.");
+    Log("[CancelVanillaAddItem] Hook installation FAILED.");
 
   return 0;
 }
@@ -178,8 +178,8 @@ static DWORD WINAPI HookInstallThread(LPVOID) {
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
   if (reason == DLL_PROCESS_ATTACH) {
     DisableThreadLibraryCalls(hModule);
-    InitModLog(hModule, "disable_add_item_mod.log");
-    Log("[DisableAddItem] disable_add_item_mod loaded. Target VA=0x%08X.",
+    InitModLog(hModule, "cancel_vanilla_add_item_mod.log");
+    Log("[CancelVanillaAddItem] cancel_vanilla_add_item_mod loaded. Target VA=0x%08X.",
         kAddItemToInventoryAddr);
     CreateThread(nullptr, 0, HookInstallThread, nullptr, 0, nullptr);
     CreateThread(nullptr, 0, WatchdogThread,    nullptr, 0, nullptr);

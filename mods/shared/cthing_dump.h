@@ -2,7 +2,7 @@
 // Author       : Yaranorgoth
 // Description  : Helper for snapshotting the first 64 bytes of a CThing object.
 //
-// Used by hook_logger_mod and disable_add_item_mod to log item metadata
+// Used by hook_logger_mod and cancel_vanilla_add_item_mod to log item metadata
 // without risking an access violation on a potentially invalid pointer.
 // =============================================================================
 
