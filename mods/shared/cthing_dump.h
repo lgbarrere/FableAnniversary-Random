@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "safe_memory.h"
 #include <windows.h>
 
 // ---------------------------------------------------------------------------
@@ -27,10 +28,7 @@ struct CThingDump {
 // ---------------------------------------------------------------------------
 inline CThingDump ReadCThingDump(void *item) {
   CThingDump d{};
-  if (item && !IsBadReadPtr(item, sizeof(d.w))) {
-    auto *ptr = reinterpret_cast<DWORD *>(item);
-    for (int i = 0; i < 16; ++i)
-      d.w[i] = ptr[i];
+  if (SafeReadBuffer(item, d.w, sizeof(d.w))) {
     d.def_id = d.w[6];
   }
   return d;

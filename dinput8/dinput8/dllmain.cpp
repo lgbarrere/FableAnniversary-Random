@@ -9,7 +9,6 @@
 #include "pch.h"
 
 #include "../../mods/shared/mod_log.h"
-#include "function_dumper.h"
 #include "windowed_hook.h"
 
 #include <cstdio>
@@ -95,12 +94,6 @@ DWORD WINAPI InitThread(LPVOID) {
   Log("Windowed hook installed.");
 
   LoadMods();
-
-  // Dump all function prototypes from Fable.exe.
-  // Output is written to FableFunctions.log in the game directory.
-  Log("Starting function prototype dump...");
-  DumpFunctionPrototypes();
-  Log("Function prototype dump complete -> FableFunctions.log");
 
   Log("Startup complete. Mod loader running.");
 

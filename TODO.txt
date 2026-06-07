@@ -1,0 +1,13 @@
+1) function_dumper_mod should be updated.
+I previously had 1170 functions listed in C:\Users\louis\Desktop\Projects\FableAnniversary-Random\FableFunctions.log.
+Now I have 1169 functions in C:\Program Files (x86)\Steam\steamapps\common\Fable The Lost Chapters\mods\FableFunctions.log.
+The missing function is AddItemToInventory at 0x005BF654.
+I need a clean dump that includes all functions regardless of currently installed hooks.
+
+2) The mods should be separated into folders in the mods folder. 
+Example:
+mods\Mod1\Mod1.dll
+mods\Mod2\Mod2.dll
+
+3) disable_add_item_mod is confusingly named.
+It should be renamed to cancel_vanilla_add_item_mod.

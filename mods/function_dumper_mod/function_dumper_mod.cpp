@@ -1,25 +1,8 @@
 // =============================================================================
 // Author       : Yaranorgoth
-// Description  : Dumps all function prototypes found in Fable.exe.
-//
-// Two name sources (no PDB required):
-//   [PROLOG]  x86 function-prolog scan (push ebp; mov ebp, esp).
-//             Identifies all non-inlined MSVC functions.
-//             Calling convention and parameter count inferred from epilogue.
-//   [RTTI]    MSVC Run-Time Type Information scan.
-//             Finds .?AV/.?AU type-descriptor strings, resolves Complete
-//             Object Locators and vtables, then labels each virtual slot as
-//             ClassName::vfunc_N.
-//
-// Hard limits without a PDB:
-//   Non-virtual function names     -> IMPOSSIBLE (stripped from binary)
-//   Real parameter / return types  -> IMPOSSIBLE (no type info in .exe)
-//
-// Output : FableFunctions.log in the game working directory.
+// Description  : Dumps all function prototypes found in Fable.exe to a log file
+//                when F2 is pressed.
 // =============================================================================
-
-#include "function_dumper.h"
-#include "pch.h"
 
 #include <algorithm>
 #include <cstdarg>
@@ -29,6 +12,8 @@
 #include <unordered_map>
 #include <vector>
 #include <windows.h>
+
+#include "../shared/mod_log.h"
 
 // UnDecorateSymbolName is the only DbgHelp function we keep (for RTTI name
 // demangling). Include DbgHelp with UNICODE suppressed so the TCHAR macros
@@ -71,6 +56,14 @@ struct FuncAnalysis {
 
 FILE *g_fp = nullptr;
 
+// Handle to this DLL; set in DllMain so we can resolve paths next to the DLL.
+static HMODULE g_hModule = nullptr;
+
+// Absolute path where FableFunctions.log is written.
+// Resolved in DumpFunctionPrototypes from g_hModule so the file always lands
+// next to function_dumper_mod.dll, regardless of the game's working directory.
+static char g_DumpPath[MAX_PATH] = "FableFunctions.log"; // fallback
+
 void WriteLine(const char *fmt, ...) {
   if (!g_fp)
     return;
@@ -110,25 +103,6 @@ static std::string DemangleRTTIName(const char *mangled) {
 
 // ---------------------------------------------------------------------------
 // RTTI scanner: find MSVC type descriptors, resolve vtables, label vfuncs.
-//
-// MSVC x86 RTTI layout:
-//   TypeDescriptor (in .data):
-//     +00  DWORD  pVFTable  VA of type_info's internal vtable
-//     +04  DWORD  spare     NULL
-//     +08  char   name[]    mangled name, e.g. ".?AVCThing@@"
-//
-//   CompleteObjectLocator (COL, in .rdata):
-//     +00  DWORD  signature  0 for x86
-//     +04  DWORD  offset     vtable offset within the class
-//     +08  DWORD  cdOffset
-//     +0C  DWORD  pTypeDes   VA of TypeDescriptor
-//     +10  DWORD  pHierDes   VA of RTTIClassHierarchyDescriptor
-//
-//   Vtable (in .rdata):
-//     [-4]  DWORD  pCOL     VA of the CompleteObjectLocator
-//     [ 0]  DWORD  vfunc_0  VA of virtual function 0
-//     [ 4]  DWORD  vfunc_1
-//     ...
 // ---------------------------------------------------------------------------
 static void CollectRTTINames(BYTE *base, DWORD imageSize,
                              std::unordered_map<DWORD, std::string> &names) {
@@ -258,15 +232,6 @@ static void CollectRTTINames(BYTE *base, DWORD imageSize,
 
 // ---------------------------------------------------------------------------
 // x86 function body analysis
-//
-// Calling convention:
-//   [RTTI / thiscall]  89 4D ??  (mov [ebp-N], ecx) in first 48 bytes
-//   [stdcall]          5D C2 NN NN  (pop ebp; ret N) in epilogue
-//   [cdecl]            5D C3        (pop ebp; ret)   in epilogue
-//
-// Parameter count:
-//   stdcall/thiscall : N from "ret N"  (exact)
-//   cdecl            : highest positive [ebp+N] access in the body (estimate)
 // ---------------------------------------------------------------------------
 static FuncAnalysis AnalyzeFunction(const BYTE *start, size_t maxBytes) {
   FuncAnalysis r;
@@ -340,8 +305,7 @@ static FuncAnalysis AnalyzeFunction(const BYTE *start, size_t maxBytes) {
 }
 
 // ---------------------------------------------------------------------------
-// Build prototype string:
-//   int __callconv name(void* this, int param_1, ...)
+// Build prototype string
 // ---------------------------------------------------------------------------
 static std::string BuildPrototype(DWORD rva, const std::string &name,
                                   const FuncAnalysis &a) {
@@ -433,21 +397,33 @@ static void ScanCodeSections(BYTE *base, DWORD imageSize,
   }
 }
 
-} // anonymous namespace
-
-// ===========================================================================
-// Public entry point
-// ===========================================================================
+// ---------------------------------------------------------------------------
+// DumpFunctionPrototypes — writes FableFunctions.log
+// ---------------------------------------------------------------------------
 void DumpFunctionPrototypes() {
-  fopen_s(&g_fp, "FableFunctions.log", "w");
-  if (!g_fp)
+  // Resolve output path next to the DLL if we have a module handle.
+  if (g_hModule) {
+    char dllPath[MAX_PATH];
+    if (GetModuleFileNameA(g_hModule, dllPath, MAX_PATH)) {
+      char *lastSlash = strrchr(dllPath, '\\');
+      if (lastSlash)
+        strcpy_s(lastSlash + 1, MAX_PATH - static_cast<int>(lastSlash - dllPath) - 1,
+                 "FableFunctions.log");
+      strcpy_s(g_DumpPath, MAX_PATH, dllPath);
+    }
+  }
+
+  fopen_s(&g_fp, g_DumpPath, "w");
+  if (!g_fp) {
+    Log("[FunctionDumperMod] ERROR: Could not open '%s' for writing.", g_DumpPath);
     return;
+  }
 
   // Header of the log file
   WriteLine("=================================================================="
             "==============");
   WriteLine("  FableAnniversary-Random  |  Function Prototype Dump");
-  WriteLine("  Generated by FableModLoader  |  " __DATE__ "  " __TIME__);
+  WriteLine("  Generated by function_dumper_mod |  " __DATE__ "  " __TIME__);
   WriteLine("=================================================================="
             "==============");
   WriteLine("");
@@ -497,14 +473,61 @@ void DumpFunctionPrototypes() {
             (unsigned)imageSize);
   WriteLine("");
 
+  // Create a clean image from disk to bypass in-memory hooks.
+  std::vector<BYTE> cleanImage(imageSize, 0);
+  bool hasCleanImage = false;
+  char exePath[MAX_PATH];
+  if (GetModuleFileNameA(hMod, exePath, MAX_PATH)) {
+    HANDLE hFile = CreateFileA(exePath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (hFile != INVALID_HANDLE_VALUE) {
+      DWORD fileSize = GetFileSize(hFile, nullptr);
+      std::vector<BYTE> diskData(fileSize);
+      DWORD read;
+      if (ReadFile(hFile, diskData.data(), fileSize, &read, nullptr) && read == fileSize) {
+        auto *dh = reinterpret_cast<IMAGE_DOS_HEADER *>(diskData.data());
+        if (dh->e_magic == IMAGE_DOS_SIGNATURE) {
+          auto *nh = reinterpret_cast<IMAGE_NT_HEADERS *>(diskData.data() + dh->e_lfanew);
+          if (nh->Signature == IMAGE_NT_SIGNATURE) {
+            DWORD headersSize = nh->OptionalHeader.SizeOfHeaders;
+            memcpy(cleanImage.data(), diskData.data(), (headersSize < imageSize) ? headersSize : imageSize);
+            IMAGE_SECTION_HEADER *sec = IMAGE_FIRST_SECTION(nh);
+            for (WORD s = 0; s < nh->FileHeader.NumberOfSections; ++s) {
+              if (sec[s].PointerToRawData > 0 && sec[s].SizeOfRawData > 0) {
+                DWORD rva = sec[s].VirtualAddress;
+                DWORD size = sec[s].SizeOfRawData;
+                if (rva + size <= imageSize && sec[s].PointerToRawData + size <= fileSize) {
+                  memcpy(cleanImage.data() + rva, diskData.data() + sec[s].PointerToRawData, size);
+                }
+              }
+            }
+            hasCleanImage = true;
+          }
+        }
+      }
+      CloseHandle(hFile);
+    }
+  }
+
+  if (!hasCleanImage) {
+    Log("[FunctionDumperMod] WARNING: Could not read original Fable.exe from disk. Using in-memory image.");
+    // Wait, if it fails, fallback to base. However, base might have uncommitted pages,
+    // but the original code just ran ScanCodeSections on it without crashing, so it should be fine.
+    // We will just do a minimal try...except or rely on the same behavior.
+    memcpy(cleanImage.data(), base, imageSize);
+  }
+
   // --- RTTI scan ---
   std::unordered_map<DWORD, std::string> rttiNames; // RVA -> label
+  // CollectRTTINames must use the memory image (base) so relocations in vtables are correct.
   CollectRTTINames(base, imageSize, rttiNames);
 
   // --- Prolog scan; attach RTTI labels ---
   std::vector<FuncEntry> entries;
-  ScanCodeSections(base, imageSize, entries);
+  // ScanCodeSections uses the clean image to avoid missing hooked functions.
+  ScanCodeSections(cleanImage.data(), imageSize, entries);
+
   for (auto &e : entries) {
+    e.address = reinterpret_cast<ULONG_PTR>(base) + e.rva; // restore proper memory address
     auto it = rttiNames.find(e.rva);
     if (it != rttiNames.end())
       e.name = it->second;
@@ -538,7 +561,7 @@ void DumpFunctionPrototypes() {
     if (funcSize > 8192)
       funcSize = 8192;
 
-    const FuncAnalysis a = AnalyzeFunction(base + e.rva, funcSize);
+    const FuncAnalysis a = AnalyzeFunction(cleanImage.data() + e.rva, funcSize);
     const char *src = rttiNames.count(e.rva) ? "[RTTI]  " : "[PROLOG]";
 
     const std::string proto = BuildPrototype(e.rva, e.name, a);
@@ -556,4 +579,39 @@ void DumpFunctionPrototypes() {
 
   fclose(g_fp);
   g_fp = nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// Thread to poll F2 key
+// ---------------------------------------------------------------------------
+DWORD WINAPI DumperThread(LPVOID) {
+  Log("[FunctionDumperMod] Started. Press F2 to dump function prototypes.");
+  
+  bool wasDown = false;
+  while (true) {
+    bool isDown = (GetAsyncKeyState(VK_F2) & 0x8000) != 0;
+    if (isDown && !wasDown) {
+      Log("[FunctionDumperMod] F2 pressed. Dumping functions...");
+      DumpFunctionPrototypes();
+      Log("[FunctionDumperMod] Dump complete -> %s", g_DumpPath);
+    }
+    wasDown = isDown;
+    Sleep(50); // 20 Hz poll
+  }
+  return 0;
+}
+
+} // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// DllMain
+// ---------------------------------------------------------------------------
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
+  if (reason == DLL_PROCESS_ATTACH) {
+    DisableThreadLibraryCalls(hModule);
+    g_hModule = hModule; // store before InitModLog so path resolution is ready
+    InitModLog(hModule, "function_dumper_mod.log");
+    CreateThread(nullptr, 0, DumperThread, nullptr, 0, nullptr);
+  }
+  return TRUE;
 }

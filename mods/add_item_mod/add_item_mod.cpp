@@ -41,6 +41,7 @@
 #include "../shared/fable_addresses.h"
 #include "../shared/fable_types.h"
 #include "../shared/mod_log.h"
+#include "../shared/safe_memory.h"
 
 #include <windows.h>
 
@@ -52,34 +53,23 @@ extern "C" __declspec(dllexport) bool g_AddingItemFromMod = false;
 // ---------------------------------------------------------------------------
 namespace {
 
-/// Safely read a DWORD from an arbitrary VA; returns false on unreadable memory.
-bool SafeRead(LPCVOID addr, DWORD &out) {
-  SIZE_T bytesRead = 0;
-  return ReadProcessMemory(GetCurrentProcess(), addr, &out, sizeof(DWORD),
-                           &bytesRead) &&
-         bytesRead == sizeof(DWORD);
-}
-
 // ---------------------------------------------------------------------------
 // GetHeroInventory — walks Fable's native object hierarchy to the inventory.
 // ---------------------------------------------------------------------------
 void *GetHeroInventory() {
   // 1. CMainGameComponent
-  auto **ppMainGame = reinterpret_cast<void **>(kMainGameComponentPtr);
-  if (IsBadReadPtr(ppMainGame, 4) || !*ppMainGame) {
+  void *pMainGame = nullptr;
+  if (!SafeRead(reinterpret_cast<LPCVOID>(kMainGameComponentPtr), pMainGame) || !pMainGame) {
     Log("[AddItemMod] GetHeroInventory: Failed to read CMainGameComponent.");
     return nullptr;
   }
-  void *pMainGame = *ppMainGame;
 
   // 2. CPlayerManager (offset kPlayerManagerOffset within CMainGameComponent)
-  auto **ppPlayerManager =
-      reinterpret_cast<void **>(static_cast<char *>(pMainGame) + kPlayerManagerOffset);
-  if (IsBadReadPtr(ppPlayerManager, 4) || !*ppPlayerManager) {
+  void *pPlayerManager = nullptr;
+  if (!SafeRead(reinterpret_cast<LPCVOID>(static_cast<char *>(pMainGame) + kPlayerManagerOffset), pPlayerManager) || !pPlayerManager) {
     Log("[AddItemMod] GetHeroInventory: Failed to read CPlayerManager.");
     return nullptr;
   }
-  void *pPlayerManager = *ppPlayerManager;
 
   // 3. Main CPlayer
   auto getMainPlayer = reinterpret_cast<void *(__thiscall *)(void *)>(kGetMainPlayerAddr);
@@ -107,13 +97,20 @@ void *GetHeroInventory() {
 
   auto getTCNode = reinterpret_cast<int(__thiscall *)(int, int *)>(kGetTCNodeAddr);
   int v29 = kTCInventory;
-  int v5  = getTCNode(reinterpret_cast<int>(pHero) + 68, &v29);
-  if (v5 == *reinterpret_cast<int *>(static_cast<char *>(pHero) + 72) ||
-      *reinterpret_cast<int *>(v5) > kTCInventory) {
-    v5 = *reinterpret_cast<int *>(static_cast<char *>(pHero) + 72);
+  int pHeroBase = reinterpret_cast<int>(pHero);
+  int v5  = getTCNode(pHeroBase + 68, &v29);
+  
+  int pHeroOffset72 = 0;
+  SafeRead(reinterpret_cast<LPCVOID>(pHeroBase + 72), pHeroOffset72);
+
+  if (v5 == pHeroOffset72 ||
+      [&]() { int v5Val = 0; SafeRead(reinterpret_cast<LPCVOID>(v5), v5Val); return v5Val > kTCInventory; }()) {
+    v5 = pHeroOffset72;
   }
 
-  void *pInventory = *reinterpret_cast<void **>(v5 + 4);
+  void *pInventory = nullptr;
+  SafeRead(reinterpret_cast<LPCVOID>(v5 + 4), pInventory);
+
   Log("[AddItemMod] GetHeroInventory resolved: 0x%p", pInventory);
   return pInventory;
 }
@@ -155,8 +152,9 @@ HWND    g_GameHwnd       = nullptr;
 WNDPROC g_OriginalWndProc = nullptr;
 
 void DoAddItem() {
+  DWORD dummy = 0;
   void *inventory = GetHeroInventory();
-  if (!inventory || IsBadReadPtr(inventory, 4)) {
+  if (!inventory || !SafeRead(inventory, dummy)) {
     Log("[AddItemMod] Cannot add item: inventory pointer unavailable.");
     return;
   }
@@ -166,7 +164,7 @@ void DoAddItem() {
   Log("[AddItemMod] Spawning Elixir of Life (def_id=%d)...", kElixirOfLifeId);
 
   void *newItem = CreateFableItem(kElixirOfLifeId);
-  if (!newItem || IsBadReadPtr(newItem, 4)) {
+  if (!newItem || !SafeRead(newItem, dummy)) {
     Log("[AddItemMod] CreateFableItem failed.");
     return;
   }
