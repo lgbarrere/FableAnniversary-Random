@@ -1,0 +1,11 @@
+List of important files for Fable Anniversary modding:
+
+WellingtonGame\FableData\Build\Data\CompiledDefs\Development:
+game.bin
+gamehard.bin
+names.bin
+script.bin
+scripthard.bin
+
+WellingtonGame\FableData\Build\Data\Levels\FinalAlbion:
+all TNG files

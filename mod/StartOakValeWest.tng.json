@@ -1,0 +1,40 @@
+[
+  {
+    "type": "added",
+    "start_line": 4,
+    "lines": [
+      "",
+      "NewThing Object;",
+      "Player 4;",
+      "UID 18446741874686334054;",
+      "DefinitionType \"OBJECT_CHEST_OPENABLE\";",
+      "ScriptName NULL;",
+      "ScriptData \"NULL\";",
+      "ThingGamePersistent TRUE;",
+      "ThingLevelPersistent TRUE;",
+      "Health 1.00000;",
+      "ObjectScale 1.00000;",
+      "StartCTCPhysicsStandard;",
+      "PositionX 15.09961;",
+      "PositionY 99.94421;",
+      "PositionZ 10.15018;",
+      "RHSetForwardX 0.24435;",
+      "RHSetForwardY -0.96968;",
+      "RHSetForwardZ 0.000000;",
+      "RHSetUpX 0.00067;",
+      "RHSetUpY -0.00017;",
+      "RHSetUpZ 0.99999;",
+      "EndCTCPhysicsStandard;",
+      "StartCTCTargeted;",
+      "Targetable TRUE;",
+      "EndCTCTargeted;",
+      "StartCTCChest;",
+      "ContainerContents[0] \"OBJECT_MUSHROOM_BLUE_01\";",
+      "ContainerContents[1] \"OBJECT_SWORD_OF_AEONS\";",
+      "ContainerContents[2] \"OBJECT_GOLD_250\";",
+      "ChestOpen FALSE;",
+      "EndCTCChest;",
+      "EndThing;"
+    ]
+  }
+]
